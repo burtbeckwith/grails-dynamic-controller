@@ -9,7 +9,7 @@ import com.burtbeckwith.grails.plugins.dynamiccontroller.DynamicDelegateControll
  */
 class DynamicControllerGrailsPlugin {
 
-	String version = '0.4-BUILD-SNAPSHOT'
+	String version = '0.4'
 	String grailsVersion = '2.0 > *'
 	List watchedResources = [
 		'file:./grails-app/controllerMixins/**/*ControllerMixin.groovy',
@@ -21,9 +21,7 @@ class DynamicControllerGrailsPlugin {
 	String authorEmail = 'burt@burtbeckwith.com'
 	String title = 'Dynamic Controller Plugin'
 	String documentation = 'http://grails.org/plugin/dynamic-controller'
-	String description = '''\
-Supports controller mixins, where action closures are retrieved from various sources including
-existing controllers, files, database source, etc. Can also create full controllers dynamically.'''
+	String description = 'Supports controller mixins, where action closures are retrieved from various sources including existing controllers, files, database source, etc. Can also create full controllers dynamically.'
 
 	def doWithApplicationContext = { ctx ->
 		// mix in all controller mixins
