@@ -40,8 +40,8 @@ public class ControllerMixinArtefactHandler extends ArtefactHandlerAdapter {
 	 *
 	 * @author <a href='mailto:burt@burtbeckwith.com'>Burt Beckwith</a>
 	 */
-	public class DefaultControllerMixinGrailsClass extends AbstractInjectableGrailsClass
-	       implements ControllerMixinGrailsClass {
+	public static class DefaultControllerMixinGrailsClass extends AbstractInjectableGrailsClass
+	              implements ControllerMixinGrailsClass {
 
 		/**
 		 * Default constructor.
