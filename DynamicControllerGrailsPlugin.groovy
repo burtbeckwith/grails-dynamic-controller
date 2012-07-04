@@ -23,6 +23,10 @@ class DynamicControllerGrailsPlugin {
 	String documentation = 'http://grails.org/plugin/dynamic-controller'
 	String description = 'Supports controller mixins, where action closures are retrieved from various sources including existing controllers, files, database source, etc. Can also create full controllers dynamically.'
 
+	String license = 'APACHE'
+	def issueManagement = [system: 'JIRA', url: 'http://jira.grails.org/browse/GPDYNAMICCONTROLLER']
+	def scm = [url: 'https://github.com/burtbeckwith/grails-dynamic-controller']
+
 	def doWithApplicationContext = { ctx ->
 		// mix in all controller mixins
 		for (ControllerMixinGrailsClass cc in application.controllerMixinClasses) {
