@@ -52,14 +52,15 @@ class DynamicControllerManager {
 
 		getClassClosures(controllerClassName).putAll controllerClassClosures
 
-		controllerClass.clazz.metaClass.getProperty = { String name ->
-			if ('controllerName' == name) {
-				// fake out as the containing controller
-				return lookupControllerClass(controllerClassName, application).logicalPropertyName
-			}
-
-			lookupProperty name, controllerClassName, delegate, application
-		}
+        //register the closures so they can be retreived by : metaProperty = controller.getMetaClass().getMetaProperty(actionName);
+        // in MixedGrailsControllerHelper
+        controllerClassClosures.each { action, closure ->
+            controllerClass.clazz.metaClass."get${action.capitalize()}" << { ->
+                Closure newClosure = closure.clone()
+                newClosure.delegate = delegate
+                newClosure
+            }
+        }
 
 		controllerClass.clazz.metaClass.methodMissing = { String name, args ->
 			// fake out as the containing controller for chain or redirect
