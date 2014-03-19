@@ -1,6 +1,7 @@
 package com.burtbeckwith.grails.plugins.dynamiccontroller
 
 import grails.util.Environment
+import grails.web.Action
 
 import java.beans.PropertyDescriptor
 import java.lang.reflect.Method
@@ -16,7 +17,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.support.AbstractBeanDefinition
 import org.springframework.beans.factory.support.GenericBeanDefinition
 import org.springframework.core.io.Resource
-import org.springframework.util.ClassUtils
 
 import com.burtbeckwith.grails.plugins.dynamiccontroller.ControllerMixinArtefactHandler.ControllerMixinGrailsClass
 
@@ -50,7 +50,7 @@ class DynamicControllerManager {
 			controllerClass.registerMapping action
 			log.info "registered action $action for $controllerClassName"
 		}
- 
+
 		getClassClosures(controllerClassName).putAll controllerClassClosureSources
 
 		controllerClass.clazz.metaClass.getProperty = { String name ->
@@ -60,6 +60,16 @@ class DynamicControllerManager {
 			}
 
 			lookupProperty name, controllerClassName, delegate, application
+		}
+
+		//register the closures so they can be retreived by : metaProperty = controller.getMetaClass().getMetaProperty(actionName);
+		// in MixedGrailsControllerHelper
+		controllerClassClosureSources.each { String action, ClosureSource cs ->
+			controllerClass.clazz.metaClass."get${action.capitalize()}" << { ->
+				Closure newClosure = cs.closure.clone()
+				newClosure.delegate = delegate
+				newClosure
+			}
 		}
 
 		controllerClass.clazz.metaClass.methodMissing = { String name, args ->
@@ -128,14 +138,14 @@ class DynamicControllerManager {
 	 * @param destControllerClazz the destination controller class
 	 */
 	void mixin(String sourceControllerClassName, String destControllerClassName, GrailsApplication application) {
-		def sourceControllerClass = application.getControllerClass(sourceControllerClassName)
+		def sourceControllerClass = lookupControllerClass(sourceControllerClassName, application)
 		if (!sourceControllerClass) {
 			log.error "Controller $sourceControllerClassName not found, cannot mix in"
 			return
 		}
 
-		mixin sourceControllerClass, destControllerClassName, application, { String controllerName, String actionName ->
-			new ControllerClosureSource(controllerName, actionName, application)
+		mixin sourceControllerClass, destControllerClassName, application, { String controllerName, String actionName, Method method ->
+			new ControllerClosureSource(controllerName, actionName, method, application)
 		}
 	}
 
@@ -165,8 +175,8 @@ class DynamicControllerManager {
 		}
 
 		for (destControllerName in destControllerNames) {
-			mixin cc, destControllerName.toString(), application, { String controllerName, String actionName ->
-				new ControllerMixinClosureSource(controllerName, actionName, application)
+			mixin cc, destControllerName.toString(), application, { String controllerName, String actionName, Method method ->
+				new ControllerMixinClosureSource(controllerName, actionName, application, method)
 			}
 		}
 	}
@@ -183,19 +193,29 @@ class DynamicControllerManager {
 
 		Map<String, ClosureSource> controllerClassClosureSources = [:]
 
+		boolean mixin = sourceControllerClass instanceof ControllerMixinArtefactHandler.ControllerMixinGrailsClass
+
 		// loop through all properties to find 'def foo = {...' or 'Closure foo = {...'
-		def instance = sourceControllerClass.newInstance()
-		for (PropertyDescriptor propertyDescriptor : sourceControllerClass.propertyDescriptors) {
-			Method readMethod = propertyDescriptor.readMethod
-			if (readMethod && !Modifier.isStatic(readMethod.modifiers)) {
-				Class<?> propertyType = propertyDescriptor.propertyType
-				if (propertyType == Object || propertyType == Closure) {
-					String closureName = propertyDescriptor.name
-					if (readMethod.parameterTypes.length == 0) {
-						def action = readMethod.invoke(instance)
-						if (action instanceof Closure) {
-							controllerClassClosureSources[closureName] = createSource(
-									sourceControllerClass.fullName, closureName)
+		// this is only needed for ControllerMixins since Grails "converts" closures to methods
+		List<String> propertyMethodNames = []
+		if (mixin) {
+			def instance = sourceControllerClass.newInstance()
+			for (PropertyDescriptor propertyDescriptor : sourceControllerClass.propertyDescriptors) {
+				Method readMethod = propertyDescriptor.readMethod
+				if (readMethod && !Modifier.isStatic(readMethod.modifiers)) {
+					if (propertyDescriptor.writeMethod) {
+						propertyMethodNames << readMethod.name
+						propertyMethodNames << propertyDescriptor.writeMethod.name
+					}
+					Class<?> propertyType = propertyDescriptor.propertyType
+					if (propertyType == Object || propertyType == Closure) {
+						String closureName = propertyDescriptor.name
+						if (readMethod.parameterTypes.length == 0) {
+							def action = readMethod.invoke(instance)
+							if (action instanceof Closure) {
+								controllerClassClosureSources[closureName] = createSource(
+									sourceControllerClass.fullName, closureName, null)
+							}
 						}
 					}
 				}
@@ -203,9 +223,21 @@ class DynamicControllerManager {
 		}
 
 		for (Method method : sourceControllerClass.clazz.methods) {
-			if (!Modifier.isStatic(method.modifiers)) {
+			if (mixin && isActionMethod(method, propertyMethodNames)) {
 				controllerClassClosureSources[method.name] = createSource(
-					sourceControllerClass.fullName, method.name)
+					sourceControllerClass.fullName, method.name, method)
+			}
+			else {
+				if (method.getAnnotation(Action)) {
+					def source
+					if (createSource.maximumNumberOfParameters == 2) {
+						source = createSource(sourceControllerClass.fullName, method.name)
+					}
+					else {
+						source = createSource(sourceControllerClass.fullName, method.name, method)
+					}
+					controllerClassClosureSources[method.name] = source
+				}
 			}
 		}
 
@@ -247,13 +279,9 @@ class DynamicControllerManager {
 		def clazz = new GroovyClassLoader(application.classLoader).parseClass(classDefinition)
 
 		// register it as if it was a class under grails-app/controllers
-		GrailsControllerClass controllerClass = application.addArtefact(
-				ControllerArtefactHandler.TYPE, clazz)
+		GrailsControllerClass controllerClass = application.addArtefact(ControllerArtefactHandler.TYPE, clazz)
 
-		// 2.0+
-		if (ClassUtils.getMethodIfAvailable(controllerClass.getClass(), 'initialize')) {
-			controllerClass.initialize()
-		}
+		controllerClass.initialize()
 
 		// register the Spring bean
 		application.mainContext.registerBeanDefinition clazz.name,
@@ -279,5 +307,25 @@ class DynamicControllerManager {
 
 	protected GrailsControllerClass lookupControllerClass(controllerClassName, GrailsApplication application) {
 		application.getControllerClass(controllerClassName)
+	}
+
+	protected boolean isActionMethod(Method method, List<String> propertyMethodNames) {
+		if (Modifier.isStatic(method.modifiers)) {
+			return false
+		}
+
+		if (propertyMethodNames.contains(method.name)) {
+			return false
+		}
+
+		if (method.declaringClass == Object) {
+			return false
+		}
+
+		if (method.name.contains('$') || method.name == 'invokeMethod' || method.name == 'setProperty' || method.name == 'getProperty') {
+			return false
+		}
+
+		true
 	}
 }

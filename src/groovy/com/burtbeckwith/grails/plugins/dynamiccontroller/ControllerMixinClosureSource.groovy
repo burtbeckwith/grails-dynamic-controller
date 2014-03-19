@@ -16,32 +16,31 @@ class ControllerMixinClosureSource extends AbstractClosureSource {
 
 	protected final String className
 	protected final GrailsApplication application
+	protected final Method method
 
 	/**
 	 * Constructor.
 	 * @param className the mixin full class name
 	 * @param actionName  the action name
 	 */
-	ControllerMixinClosureSource(String className, String actionName, GrailsApplication application) {
+	ControllerMixinClosureSource(String className, String actionName, GrailsApplication application, Method method) {
 		super(actionName)
 		this.className = className
 		this.application = application
+		this.method = method
 	}
 
 	@Override
 	protected Closure doGetClosure() {
-		ControllerMixinGrailsClass mixin = application.getArtefact(
-				ControllerMixinArtefactHandler.TYPE, className)
+
+		if (method != null) {
+			return { -> method.invoke application.mainContext.getBean(className) }
+		}
+
+		ControllerMixinGrailsClass mixin = application.getArtefact(ControllerMixinArtefactHandler.TYPE, className)
 		for (PropertyDescriptor pd : mixin.propertyDescriptors) {
 			if (pd.name.equals(actionName)) {
 				return mixin.newInstance()."$actionName"
-			}
-		}
-
-		// 2.0 support; will fail for methods that take parameters
-		for (Method method : mixin.clazz.methods) {
-			if (method.name.equals(actionName)) {
-				return { -> method.invoke mixin.newInstance() }
 			}
 		}
 
