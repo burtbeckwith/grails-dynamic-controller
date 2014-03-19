@@ -27,10 +27,15 @@ class DynamicControllerGrailsPlugin {
 	def issueManagement = [system: 'JIRA', url: 'http://jira.grails.org/browse/GPDYNAMICCONTROLLER']
 	def scm = [url: 'https://github.com/burtbeckwith/grails-dynamic-controller']
 
+	def doWithSpring = {
+		dynamicControllerManager(DynamicControllerManager)
+	}
+
 	def doWithApplicationContext = { ctx ->
+		def dynamicControllerManager = ctx.dynamicControllerManager
 		// mix in all controller mixins
 		for (ControllerMixinGrailsClass cc in application.controllerMixinClasses) {
-			DynamicControllerManager.mixin cc, application
+			dynamicControllerManager.mixin cc, application
 		}
 	}
 
@@ -48,7 +53,7 @@ class DynamicControllerGrailsPlugin {
 	}
 
 	def onChange = { event ->
-		event.application.addArtefact ControllerMixinArtefactHandler.TYPE, event.source
-		DynamicControllerManager.mixin new DefaultControllerMixinGrailsClass(event.source), event.application
+		application.addArtefact ControllerMixinArtefactHandler.TYPE, event.source
+		application.mainContext.dynamicControllerManager.mixin new DefaultControllerMixinGrailsClass(event.source), application
 	}
 }

@@ -70,15 +70,16 @@ class DatabaseClosureSource extends AbstractClosureSource {
 	 */
 	static void registerAll(dataSource, GrailsApplication application) {
 		def sql = new Sql(dataSource)
+		def dynamicControllerManager = application.mainContext.dynamicControllerManager
 
 		def controllers = []
 		sql.eachRow('select distinct controller from closures', { controllers << it.controller })
 		for (controller in controllers) {
-		    def closures = [:]
-		    sql.eachRow('select action from closures where controller=?', [controller], {
-		        closures[it.action] = new DatabaseClosureSource(controller, it.action, dataSource)
-		    })
-		    DynamicControllerManager.registerClosures controller, closures, null, application
+			def closures = [:]
+			sql.eachRow('select action from closures where controller=?', [controller], {
+				closures[it.action] = new DatabaseClosureSource(controller, it.action, dataSource)
+			})
+			dynamicControllerManager.registerClosures controller, closures, null, application
 		}
 	}
 }

@@ -26,8 +26,9 @@ import com.burtbeckwith.grails.plugins.dynamiccontroller.ControllerMixinArtefact
  */
 class DynamicControllerManager {
 
-	private static Map<String, Map<String, ?>> _closures = [:]
 	private static final LOG = Logger.getLogger(this)
+
+	private Map<String, Map<String, ?>> _closures = [:]
 
 	/**
 	 * Register controller closures.
@@ -35,7 +36,7 @@ class DynamicControllerManager {
 	 * @param controllerClassClosures  the action names and closures
 	 * @param plugin  optional name and version if registered from a plugin
 	 */
-	static void registerClosures(String controllerClassName, Map<String, ?> controllerClassClosures,
+	void registerClosures(String controllerClassName, Map<String, ?> controllerClassClosures,
 			plugin, GrailsApplication application) {
 
 		GrailsControllerClass controllerClass = lookupControllerClass(controllerClassName, application)
@@ -84,7 +85,7 @@ class DynamicControllerManager {
 	 * @param resource  the resource
 	 * @param plugin  optional name and version if registered from a plugin
 	 */
-	static void registerClosures(String controllerClassName, Resource resource, plugin, GrailsApplication application) {
+	void registerClosures(String controllerClassName, Resource resource, plugin, GrailsApplication application) {
 		def config = new ConfigSlurper(Environment.current.name).parse(resource.getURL())
 
 		Map<String, ?> closureSources = [:]
@@ -94,7 +95,7 @@ class DynamicControllerManager {
 		registerClosures controllerClassName, closureSources, plugin, application
 	}
 
-	private static lookupProperty(String name, String controllerClassName, controller, GrailsApplication application) {
+	private lookupProperty(String name, String controllerClassName, controller, GrailsApplication application) {
 		// look first for a closure with that name, assuming it's an action; not cached here
 		// like you would with standard propertyMissing since AbstractClosureSource manages that
 		def closure = getClassClosures(controllerClassName)[name]
@@ -126,7 +127,7 @@ class DynamicControllerManager {
 	 * @param sourceControllerClassName  the source class name
 	 * @param destControllerClazz  the destination controller class
 	 */
-	static void mixin(String sourceControllerClassName, String destControllerClassName, GrailsApplication application) {
+	void mixin(String sourceControllerClassName, String destControllerClassName, GrailsApplication application) {
 		def sourceControllerClass = application.getArtefact('Controller', sourceControllerClassName)
 		if (!sourceControllerClass) {
 			LOG.error "Controller $sourceControllerClassName not found, cannot mix in"
@@ -142,7 +143,7 @@ class DynamicControllerManager {
 	 * Mix in closures from a ControllerMixinGrailsClass.
 	 * @param cc  the source
 	 */
-	static void mixin(ControllerMixinGrailsClass cc, GrailsApplication application) {
+	void mixin(ControllerMixinGrailsClass cc, GrailsApplication application) {
 		List destControllerNames
 
 		// see if there's a static 'controller' property first
@@ -177,8 +178,8 @@ class DynamicControllerManager {
 	 * @param destControllerClassName  the destination controller class name
 	 * @param createSource  a closure that creates a ClosureSource
 	 */
-	static void mixin(GrailsClass sourceControllerClass, String destControllerClassName,
-	                  GrailsApplication application, createSource) {
+	void mixin(GrailsClass sourceControllerClass, String destControllerClassName,
+	           GrailsApplication application, createSource) {
 
 		Map<String, ?> controllerClassClosures = [:]
 
@@ -224,7 +225,7 @@ class DynamicControllerManager {
 	 * @param plugin  optional name and version if registered from a plugin
 	 * @return  the controller class
 	 */
-	static GrailsControllerClass createDynamicController(String className, plugin, GrailsApplication application) {
+	GrailsControllerClass createDynamicController(String className, plugin, GrailsApplication application) {
 
 		String packageDef = ''
 		int index = className.lastIndexOf('.')
@@ -263,11 +264,11 @@ class DynamicControllerManager {
 		controllerClass
 	}
 
-	static Collection<String> getDynamicActions(String controllerClassName) {
+	Collection<String> getDynamicActions(String controllerClassName) {
 		getClassClosures(controllerClassName).keySet()
 	}
 
-	private static Map getClassClosures(String controllerClassName) {
+	private Map getClassClosures(String controllerClassName) {
 		def closures = _closures[controllerClassName]
 		if (closures == null) {
 			closures = [:]
@@ -276,7 +277,7 @@ class DynamicControllerManager {
 		closures
 	}
 
-	private static GrailsControllerClass lookupControllerClass(controllerClassName, GrailsApplication application) {
+	private GrailsControllerClass lookupControllerClass(controllerClassName, GrailsApplication application) {
 		application.getControllerClass(controllerClassName)
 	}
 }
