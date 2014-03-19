@@ -3,7 +3,8 @@ package com.burtbeckwith.grails.plugins.dynamiccontroller;
 import grails.util.Environment;
 import groovy.lang.Closure;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Base class for ClosureSource implementations. Caches the resolved closure
@@ -14,13 +15,13 @@ import org.apache.log4j.Logger;
  */
 public abstract class AbstractClosureSource implements ClosureSource {
 
-	private final String _actionName;
+	protected final String actionName;
 	@SuppressWarnings("rawtypes")
-	private Closure _closure;
-	private final Logger _log = Logger.getLogger(getClass());
+	protected Closure closure;
+	protected final Logger log = LoggerFactory.getLogger(getClass());
 
 	protected AbstractClosureSource(String actionName) {
-		_actionName = actionName;
+		this.actionName = actionName;
 	}
 
 	/**
@@ -30,22 +31,22 @@ public abstract class AbstractClosureSource implements ClosureSource {
 	@SuppressWarnings("rawtypes")
 	@Override
 	public synchronized Closure getClosure() {
-		if (!Environment.isDevelopmentMode() && _closure != null) {
-			return _closure;
+		if (!Environment.isDevelopmentMode() && closure != null) {
+			return closure;
 		}
 
-		_closure = doGetClosure();
-		return _closure;
+		closure = doGetClosure();
+		return closure;
 	}
 
 	@SuppressWarnings("rawtypes")
 	protected abstract Closure doGetClosure();
 
 	protected String getActionName() {
-		return _actionName;
+		return actionName;
 	}
 
 	protected Logger getLog() {
-		return _log;
+		return log;
 	}
 }

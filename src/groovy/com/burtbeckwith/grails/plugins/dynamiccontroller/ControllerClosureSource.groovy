@@ -15,8 +15,8 @@ import org.codehaus.groovy.grails.commons.GrailsControllerClass
  */
 class ControllerClosureSource extends AbstractClosureSource {
 
-	private final String _className
-	private final GrailsApplication _application
+	protected final String className
+	protected final GrailsApplication application
 
 	/**
 	 * Constructor.
@@ -25,16 +25,16 @@ class ControllerClosureSource extends AbstractClosureSource {
 	 */
 	ControllerClosureSource(String className, String actionName, GrailsApplication application) {
 		super(actionName)
-		_className = className
-		_application = application
+		this.className = className
+		this.application = application
 	}
 
 	@Override
 	protected Closure doGetClosure() {
-		GrailsControllerClass controllerClass = _application.getArtefact(ControllerArtefactHandler.TYPE, _className)
+		GrailsControllerClass controllerClass = application.getArtefact(ControllerArtefactHandler.TYPE, className)
 		for (PropertyDescriptor pd : controllerClass.propertyDescriptors) {
 			if (pd.name.equals(actionName)) {
-				def controller = _application.mainContext.getBean(_className)
+				def controller = application.mainContext.getBean(className)
 				return controller."$actionName"
 			}
 		}
@@ -43,13 +43,13 @@ class ControllerClosureSource extends AbstractClosureSource {
 		for (Method method : controllerClass.clazz.methods) {
 			if (method.name.equals(actionName)) {
 				return { ->
-					def controller = _application.mainContext.getBean(_className)
+					def controller = application.mainContext.getBean(className)
 					method.invoke controller
 				}
 			}
 		}
 
-		log.error "Closure/Method $actionName not found for controller $_className"
+		log.error "Closure/Method $actionName not found for controller $className"
 		return null
 	}
 }

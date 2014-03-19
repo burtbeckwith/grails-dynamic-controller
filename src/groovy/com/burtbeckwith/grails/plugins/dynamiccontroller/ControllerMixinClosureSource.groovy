@@ -14,8 +14,8 @@ import com.burtbeckwith.grails.plugins.dynamiccontroller.ControllerMixinArtefact
  */
 class ControllerMixinClosureSource extends AbstractClosureSource {
 
-	private final String _className
-	private final GrailsApplication _application
+	protected final String className
+	protected final GrailsApplication application
 
 	/**
 	 * Constructor.
@@ -24,14 +24,14 @@ class ControllerMixinClosureSource extends AbstractClosureSource {
 	 */
 	ControllerMixinClosureSource(String className, String actionName, GrailsApplication application) {
 		super(actionName)
-		_className = className
-		_application = application
+		this.className = className
+		this.application = application
 	}
 
 	@Override
 	protected Closure doGetClosure() {
-		ControllerMixinGrailsClass mixin = _application.getArtefact(
-				ControllerMixinArtefactHandler.TYPE, _className)
+		ControllerMixinGrailsClass mixin = application.getArtefact(
+				ControllerMixinArtefactHandler.TYPE, className)
 		for (PropertyDescriptor pd : mixin.propertyDescriptors) {
 			if (pd.name.equals(actionName)) {
 				return mixin.newInstance()."$actionName"
@@ -45,7 +45,7 @@ class ControllerMixinClosureSource extends AbstractClosureSource {
 			}
 		}
 
-		log.error "Closure $actionName not found for mixin $_className"
+		log.error "Closure $actionName not found for mixin $className"
 		return null
 	}
 }

@@ -6,12 +6,13 @@ import java.beans.PropertyDescriptor
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
-import org.apache.log4j.Logger
 import org.codehaus.groovy.grails.commons.ControllerArtefactHandler
 import org.codehaus.groovy.grails.commons.GrailsApplication
 import org.codehaus.groovy.grails.commons.GrailsClass
 import org.codehaus.groovy.grails.commons.GrailsControllerClass
 import org.codehaus.groovy.grails.plugins.metadata.GrailsPlugin
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.support.AbstractBeanDefinition
 import org.springframework.beans.factory.support.GenericBeanDefinition
 import org.springframework.core.io.Resource
@@ -26,32 +27,31 @@ import com.burtbeckwith.grails.plugins.dynamiccontroller.ControllerMixinArtefact
  */
 class DynamicControllerManager {
 
-	private static final LOG = Logger.getLogger(this)
-
-	private Map<String, Map<String, ?>> _closures = [:]
+	protected final Map<String, Map<String, ?>> closures = [:]
+	protected final Logger log = LoggerFactory.getLogger(getClass())
 
 	/**
 	 * Register controller closures.
-	 * @param controllerClassName  the class name of the destination controller
-	 * @param controllerClassClosures  the action names and closures
-	 * @param plugin  optional name and version if registered from a plugin
+	 * @param controllerClassName the class name of the destination controller
+	 * @param controllerClassClosureSources the action names and ClosureSources
+	 * @param plugin optional name and version if registered from a plugin
 	 */
-	void registerClosures(String controllerClassName, Map<String, ?> controllerClassClosures,
-			plugin, GrailsApplication application) {
+	void registerClosures(String controllerClassName, Map<String, ClosureSource> controllerClassClosureSources,
+	                      plugin, GrailsApplication application) {
 
 		GrailsControllerClass controllerClass = lookupControllerClass(controllerClassName, application)
 		if (!controllerClass) {
-			LOG.info "Can't find controller with name $controllerClassName, creating dynamic controller"
+			log.info "Can't find controller with name $controllerClassName, creating dynamic controller"
 			controllerClass = createDynamicController(controllerClassName, plugin, application)
 		}
 
 		// register the urls /controllername/actionname and /controllername/actionname/**
-		for (action in controllerClassClosures.keySet()) {
+		for (String action in controllerClassClosureSources.keySet()) {
 			controllerClass.registerMapping action
-			LOG.info "registered action $action for $controllerClassName"
+			log.info "registered action $action for $controllerClassName"
 		}
-
-		getClassClosures(controllerClassName).putAll controllerClassClosures
+ 
+		getClassClosures(controllerClassName).putAll controllerClassClosureSources
 
 		controllerClass.clazz.metaClass.getProperty = { String name ->
 			if ('controllerName' == name) {
@@ -81,9 +81,9 @@ class DynamicControllerManager {
 
 	/**
 	 * Register controller closures from a Resource.
-	 * @param controllerClassName  the class name of the destination controller
-	 * @param resource  the resource
-	 * @param plugin  optional name and version if registered from a plugin
+	 * @param controllerClassName the class name of the destination controller
+	 * @param resource the resource
+	 * @param plugin optional name and version if registered from a plugin
 	 */
 	void registerClosures(String controllerClassName, Resource resource, plugin, GrailsApplication application) {
 		def config = new ConfigSlurper(Environment.current.name).parse(resource.getURL())
@@ -95,7 +95,7 @@ class DynamicControllerManager {
 		registerClosures controllerClassName, closureSources, plugin, application
 	}
 
-	private lookupProperty(String name, String controllerClassName, controller, GrailsApplication application) {
+	protected lookupProperty(String name, String controllerClassName, controller, GrailsApplication application) {
 		// look first for a closure with that name, assuming it's an action; not cached here
 		// like you would with standard propertyMissing since AbstractClosureSource manages that
 		def closure = getClassClosures(controllerClassName)[name]
@@ -124,24 +124,24 @@ class DynamicControllerManager {
 
 	/**
 	 * Mix in closures from a controller.
-	 * @param sourceControllerClassName  the source class name
-	 * @param destControllerClazz  the destination controller class
+	 * @param sourceControllerClassName the source class name
+	 * @param destControllerClazz the destination controller class
 	 */
 	void mixin(String sourceControllerClassName, String destControllerClassName, GrailsApplication application) {
-		def sourceControllerClass = application.getArtefact('Controller', sourceControllerClassName)
+		def sourceControllerClass = application.getControllerClass(sourceControllerClassName)
 		if (!sourceControllerClass) {
-			LOG.error "Controller $sourceControllerClassName not found, cannot mix in"
+			log.error "Controller $sourceControllerClassName not found, cannot mix in"
 			return
 		}
 
-		mixin sourceControllerClass, destControllerClassName, application, { controllerName, actionName ->
+		mixin sourceControllerClass, destControllerClassName, application, { String controllerName, String actionName ->
 			new ControllerClosureSource(controllerName, actionName, application)
 		}
 	}
 
 	/**
 	 * Mix in closures from a ControllerMixinGrailsClass.
-	 * @param cc  the source
+	 * @param cc the source
 	 */
 	void mixin(ControllerMixinGrailsClass cc, GrailsApplication application) {
 		List destControllerNames
@@ -159,13 +159,13 @@ class DynamicControllerManager {
 		}
 
 		if (!destControllerNames) {
-			LOG.error "No destination controller specified in the 'controller' property or " +
+			log.error "No destination controller specified in the 'controller' property or " +
 				"'grails.plugins.dynamicController.mixins' config attribute for ${cc.name}ControllerMixin, ignoring"
 			return
 		}
 
 		for (destControllerName in destControllerNames) {
-			mixin cc, destControllerName.toString(), application, { controllerName, actionName ->
+			mixin cc, destControllerName.toString(), application, { String controllerName, String actionName ->
 				new ControllerMixinClosureSource(controllerName, actionName, application)
 			}
 		}
@@ -174,14 +174,14 @@ class DynamicControllerManager {
 	/**
 	 * Mix in closures from a controller or ControllerMixinGrailsClass.
 	 *
-	 * @param sourceControllerClass  the source
-	 * @param destControllerClassName  the destination controller class name
-	 * @param createSource  a closure that creates a ClosureSource
+	 * @param sourceControllerClass the source
+	 * @param destControllerClassName the destination controller class name
+	 * @param createSource a closure that creates a ClosureSource
 	 */
 	void mixin(GrailsClass sourceControllerClass, String destControllerClassName,
-	           GrailsApplication application, createSource) {
+	           GrailsApplication application, Closure createSource) {
 
-		Map<String, ?> controllerClassClosures = [:]
+		Map<String, ClosureSource> controllerClassClosureSources = [:]
 
 		// loop through all properties to find 'def foo = {...' or 'Closure foo = {...'
 		def instance = sourceControllerClass.newInstance()
@@ -194,7 +194,7 @@ class DynamicControllerManager {
 					if (readMethod.parameterTypes.length == 0) {
 						def action = readMethod.invoke(instance)
 						if (action instanceof Closure) {
-							controllerClassClosures[closureName] = createSource(
+							controllerClassClosureSources[closureName] = createSource(
 									sourceControllerClass.fullName, closureName)
 						}
 					}
@@ -204,7 +204,7 @@ class DynamicControllerManager {
 
 		for (Method method : sourceControllerClass.clazz.methods) {
 			if (!Modifier.isStatic(method.modifiers)) {
-				controllerClassClosures[method.name] = createSource(
+				controllerClassClosureSources[method.name] = createSource(
 					sourceControllerClass.fullName, method.name)
 			}
 		}
@@ -216,14 +216,14 @@ class DynamicControllerManager {
 			plugin.version = annotation.version()
 		}
 
-		registerClosures destControllerClassName, controllerClassClosures, plugin, application
+		registerClosures destControllerClassName, controllerClassClosureSources, plugin, application
 	}
 
 	/**
 	 * Compiles and registers a plugin to contain action closures.
-	 * @param className  the full class name to use
-	 * @param plugin  optional name and version if registered from a plugin
-	 * @return  the controller class
+	 * @param className the full class name to use
+	 * @param plugin optional name and version if registered from a plugin
+	 * @return the controller class
 	 */
 	GrailsControllerClass createDynamicController(String className, plugin, GrailsApplication application) {
 
@@ -243,7 +243,7 @@ class DynamicControllerManager {
 		$annotation
 		class $className {}
 		"""
-		LOG.debug "defining new controller as\n$classDefinition"
+		log.debug "defining new controller as\n$classDefinition"
 		def clazz = new GroovyClassLoader(application.classLoader).parseClass(classDefinition)
 
 		// register it as if it was a class under grails-app/controllers
@@ -268,16 +268,16 @@ class DynamicControllerManager {
 		getClassClosures(controllerClassName).keySet()
 	}
 
-	private Map getClassClosures(String controllerClassName) {
-		def closures = _closures[controllerClassName]
-		if (closures == null) {
-			closures = [:]
-			_closures[controllerClassName] = closures
+	protected Map getClassClosures(String controllerClassName) {
+		def controllerClosures = closures[controllerClassName]
+		if (controllerClosures == null) {
+			controllerClosures = [:]
+			closures[controllerClassName] = controllerClosures
 		}
-		closures
+		controllerClosures
 	}
 
-	private GrailsControllerClass lookupControllerClass(controllerClassName, GrailsApplication application) {
+	protected GrailsControllerClass lookupControllerClass(controllerClassName, GrailsApplication application) {
 		application.getControllerClass(controllerClassName)
 	}
 }

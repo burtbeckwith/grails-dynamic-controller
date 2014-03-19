@@ -5,5 +5,6 @@ git clone git@github.com:burtbeckwith/grails-dynamic-controller.git
 cd grails-dynamic-controller
 grails clean
 grails compile
-grails publish-plugin --noScm --stacktrace
-#grails publish-plugin --noScm --stacktrace --snapshot
+
+#grails publish-plugin --snapshot --stacktrace
+grails publish-plugin --stacktrace

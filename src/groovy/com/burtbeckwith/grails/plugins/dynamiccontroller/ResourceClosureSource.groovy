@@ -23,21 +23,21 @@ import org.springframework.core.io.Resource
  */
 class ResourceClosureSource extends AbstractClosureSource {
 
-	private final Resource _resource
+	protected final Resource resource
 
 	/**
 	 * Constructor.
-	 * @param resource  the resource
-	 * @param actionName  the action name
+	 * @param resource the resource
+	 * @param actionName the action name
 	 */
 	ResourceClosureSource(Resource resource, String actionName) {
 		super(actionName)
-		_resource = resource
+		this.resource = resource
 	}
 
 	@Override
 	protected Closure doGetClosure() {
-		def config = new ConfigSlurper(Environment.current.name).parse(_resource.getURL())
+		def config = new ConfigSlurper(Environment.current.name).parse(resource.getURL())
 		config[actionName]
 	}
 }

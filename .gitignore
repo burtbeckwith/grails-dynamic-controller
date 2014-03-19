@@ -1,8 +1,8 @@
-*.zip
-/plugin.xml
 *.log
-target
-.settings
-web-app/META-INF
-web-app/WEB-INF
+/target
 /docs
+grails-dynamic-controller-*.zip
+grails-dynamic-controller-*.zip.sha1
+plugin.xml
+.settings
+web-app
