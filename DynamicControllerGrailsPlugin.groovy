@@ -29,6 +29,12 @@ class DynamicControllerGrailsPlugin {
 
 	def doWithSpring = {
 		dynamicControllerManager(DynamicControllerManager)
+
+		for (ControllerMixinGrailsClass cmgc in application.controllerMixinClasses) {
+			"$cmgc.clazz.name"(cmgc.clazz) { bean ->
+				bean.autoWire = 'byName'
+			}
+		}
 	}
 
 	def doWithApplicationContext = { ctx ->
