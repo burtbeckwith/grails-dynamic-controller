@@ -9,7 +9,7 @@ import com.burtbeckwith.grails.plugins.dynamiccontroller.DynamicDelegateControll
  */
 class DynamicControllerGrailsPlugin {
 
-	String version = '0.5'
+	String version = '0.5.1'
 	String grailsVersion = '2.0 > *'
 	List watchedResources = [
 		'file:./grails-app/controllerMixins/**/*ControllerMixin.groovy',
