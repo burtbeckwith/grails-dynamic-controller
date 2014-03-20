@@ -32,7 +32,7 @@ class DynamicControllerGrailsPlugin {
 
 		for (ControllerMixinGrailsClass cmgc in application.controllerMixinClasses) {
 			"$cmgc.clazz.name"(cmgc.clazz) { bean ->
-				bean.autoWire = 'byName'
+				bean.autowire = 'byName'
 			}
 		}
 	}
